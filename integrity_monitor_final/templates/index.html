@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Integrity Shield — File Monitoring System</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;600;700;900&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #040810;
+      --surface: #080f1f;
+      --card: #0b1628;
+      --border: #1a2d4a;
+      --accent: #00d4ff;
+      --accent2: #00ff88;
+      --accent3: #ff3d71;
+      --accent4: #ffaa00;
+      --text: #c8ddf5;
+      --muted: #4a6a8a;
+      --glow: 0 0 20px rgba(0,212,255,0.4);
+      --glow-green: 0 0 20px rgba(0,255,136,0.4);
+      --glow-red: 0 0 20px rgba(255,61,113,0.4);
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Rajdhani', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content:'';
+      position:fixed; inset:0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+      background-size:50px 50px;
+      pointer-events:none; z-index:0;
+    }
+
+    body::after {
+      content:'';
+      position:fixed; top:-50%; left:-50%; width:200%; height:200%;
+      background:
+        radial-gradient(ellipse at 60% 20%, rgba(0,212,255,0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 20% 80%, rgba(0,255,136,0.04) 0%, transparent 50%);
+      pointer-events:none; z-index:0;
+      animation:bgPulse 8s ease-in-out infinite alternate;
+    }
+
+    @keyframes bgPulse { 0%{transform:scale(1)} 100%{transform:scale(1.05)} }
+
+    /* ── NAV ── */
+    nav {
+      position:sticky; top:0; z-index:100;
+      background:rgba(4,8,16,0.94);
+      backdrop-filter:blur(20px);
+      border-bottom:1px solid var(--border);
+      padding:0 2rem;
+      display:flex; align-items:center; justify-content:space-between;
+      height:64px;
+    }
+
+    .nav-logo {
+      display:flex; align-items:center; gap:12px;
+      font-family:'Orbitron',monospace; font-weight:700; font-size:1.05rem;
+      color:var(--accent); text-shadow:var(--glow); text-decoration:none;
+    }
+
+    .nav-logo svg { filter:drop-shadow(0 0 8px rgba(0,212,255,0.8)); }
+
+    .nav-links { display:flex; align-items:center; gap:4px; list-style:none; }
+
+    .nav-links a {
+      text-decoration:none; color:var(--muted);
+      font-family:'Space Mono',monospace; font-size:0.72rem;
+      letter-spacing:0.08em; padding:0.45rem 1rem;
+      border:1px solid transparent; border-radius:4px;
+      transition:all 0.2s; text-transform:uppercase; cursor:pointer;
+    }
+
+    .nav-links a:hover {
+      color:var(--accent); border-color:rgba(0,212,255,0.4);
+      background:rgba(0,212,255,0.07); box-shadow:var(--glow);
+    }
+
+    .nav-status {
+      display:flex; align-items:center; gap:8px;
+      font-family:'Space Mono',monospace; font-size:0.68rem; color:var(--accent2);
+    }
+
+    .pulse-dot {
+      width:8px; height:8px; background:var(--accent2); border-radius:50%;
+      animation:pulse 2s infinite; box-shadow:0 0 8px var(--accent2);
+    }
+
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.4)} }
+
+    /* ── HERO ── */
+    .hero {
+      position:relative; z-index:1;
+      text-align:center; padding:5rem 2rem 2.5rem;
+    }
+
+    .hero-badge {
+      display:inline-flex; align-items:center; gap:8px;
+      font-family:'Space Mono',monospace; font-size:0.68rem;
+      letter-spacing:0.25em; color:var(--accent);
+      border:1px solid rgba(0,212,255,0.3); padding:0.35rem 1.1rem;
+      border-radius:2px; margin-bottom:1.5rem; text-transform:uppercase;
+      animation:fadeDown 0.5s ease both;
+    }
+
+    .hero h1 {
+      font-family:'Orbitron',monospace;
+      font-size:clamp(2rem,5vw,3.6rem);
+      font-weight:900; line-height:1.1; margin-bottom:1rem;
+      animation:fadeDown 0.65s ease both;
+    }
+
+    .hero h1 .grad {
+      background:linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+    }
+
+    .hero p {
+      color:var(--muted); font-size:1.05rem; max-width:520px;
+      margin:0 auto 1.5rem; line-height:1.7;
+      animation:fadeDown 0.8s ease both;
+    }
+
+    @keyframes fadeDown { from{opacity:0;transform:translateY(-18px)} to{opacity:1;transform:translateY(0)} }
+
+    /* ── STATS ── */
+    .stats-bar {
+      position:relative; z-index:1;
+      display:flex; justify-content:center; gap:1px;
+      padding:0 2rem 3rem; flex-wrap:wrap;
+    }
+
+    .stat-card {
+      background:var(--card); border:1px solid var(--border);
+      padding:1.2rem 2.2rem; text-align:center; min-width:140px;
+      position:relative; overflow:hidden; transition:border-color 0.3s;
+    }
+
+    .stat-card:first-child { border-radius:8px 0 0 8px; }
+    .stat-card:last-child  { border-radius:0 8px 8px 0; }
+    .stat-card:hover { border-color:var(--accent); }
+
+    .stat-card::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background:linear-gradient(90deg,transparent,var(--accent),transparent);
+      opacity:0; transition:opacity 0.3s;
+    }
+    .stat-card:hover::before { opacity:1; }
+
+    .stat-num { font-family:'Orbitron',monospace; font-size:2rem; font-weight:700; color:var(--accent); text-shadow:var(--glow); }
+    .stat-num.green { color:var(--accent2); text-shadow:var(--glow-green); }
+    .stat-num.red   { color:var(--accent3); text-shadow:var(--glow-red); }
+    .stat-num.gold  { color:var(--accent4); }
+
+    .stat-label { font-family:'Space Mono',monospace; font-size:0.62rem; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase; margin-top:0.3rem; }
+
+    /* ── MAIN GRID ── */
+    .main-grid {
+      position:relative; z-index:1;
+      display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;
+      max-width:1200px; margin:0 auto; padding:0 2rem 2rem;
+    }
+
+    @media(max-width:768px){ .main-grid{ grid-template-columns:1fr; } }
+
+    /* ── CARDS ── */
+    .card {
+      background:var(--card); border:1px solid var(--border);
+      border-radius:12px; padding:2rem;
+      position:relative; overflow:hidden; transition:border-color 0.3s,transform 0.3s;
+    }
+    .card:hover { border-color:rgba(0,212,255,0.35); transform:translateY(-2px); }
+    .card::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:1px;
+      background:linear-gradient(90deg,transparent,var(--accent),transparent);
+    }
+
+    .card-header { display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem; }
+
+    .card-icon {
+      width:48px; height:48px; border-radius:10px;
+      display:flex; align-items:center; justify-content:center; font-size:1.5rem; flex-shrink:0;
+    }
+    .card-icon.blue  { background:rgba(0,212,255,0.12); border:1px solid rgba(0,212,255,0.3); }
+    .card-icon.green { background:rgba(0,255,136,0.12); border:1px solid rgba(0,255,136,0.3); }
+
+    .card-title    { font-family:'Orbitron',monospace; font-size:1rem; font-weight:700; color:#fff; }
+    .card-subtitle { font-size:0.85rem; color:var(--muted); margin-top:0.2rem; }
+
+    /* ── DROP ZONE ── */
+    .drop-zone {
+      border:2px dashed var(--border); border-radius:10px;
+      padding:2.5rem 1rem; text-align:center; cursor:pointer;
+      transition:all 0.3s; position:relative; background:rgba(255,255,255,0.01);
+    }
+    .drop-zone:hover,.drop-zone.dragover {
+      border-color:var(--accent); background:rgba(0,212,255,0.05);
+      box-shadow:inset 0 0 30px rgba(0,212,255,0.06);
+    }
+    .drop-zone.vzone:hover,.drop-zone.vzone.dragover {
+      border-color:var(--accent2); background:rgba(0,255,136,0.05);
+      box-shadow:inset 0 0 30px rgba(0,255,136,0.06);
+    }
+
+    .drop-icon { font-size:2.5rem; margin-bottom:0.75rem; display:block; }
+    .drop-text { color:var(--muted); font-size:0.9rem; }
+    .drop-text .link { color:var(--accent); }
+    .drop-text .link-g { color:var(--accent2); }
+
+    input[type="file"] { display:none; }
+
+    .file-info {
+      display:none; align-items:center; gap:0.75rem;
+      background:rgba(0,212,255,0.07); border:1px solid rgba(0,212,255,0.2);
+      border-radius:8px; padding:0.75rem 1rem; margin-top:1rem;
+    }
+    .file-info.gv { background:rgba(0,255,136,0.07); border-color:rgba(0,255,136,0.2); }
+
+    .file-name { font-family:'Space Mono',monospace; font-size:0.72rem; word-break:break-all; color:var(--text); }
+    .file-sz   { font-family:'Space Mono',monospace; font-size:0.65rem; color:var(--muted); margin-top:2px; }
+
+    .size-bar  { height:3px; background:var(--border); border-radius:2px; margin-top:6px; overflow:hidden; }
+    .size-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:2px; transition:width 0.5s; }
+
+    /* ── BUTTONS ── */
+    .btn {
+      width:100%; padding:0.9rem; border:none; border-radius:8px;
+      font-family:'Orbitron',monospace; font-size:0.78rem; font-weight:700;
+      letter-spacing:0.1em; cursor:pointer; transition:all 0.3s;
+      text-transform:uppercase; margin-top:1rem; position:relative; overflow:hidden;
+    }
+    .btn::after {
+      content:''; position:absolute; inset:0;
+      background:linear-gradient(135deg,rgba(255,255,255,0.1),transparent);
+      opacity:0; transition:opacity 0.3s;
+    }
+    .btn:hover::after { opacity:1; }
+    .btn-upload { background:linear-gradient(135deg,#0055cc,var(--accent)); color:#fff; box-shadow:0 4px 20px rgba(0,212,255,0.3); }
+    .btn-upload:hover { box-shadow:0 6px 30px rgba(0,212,255,0.5); transform:translateY(-1px); }
+    .btn-verify { background:linear-gradient(135deg,#007a3d,var(--accent2)); color:#000; box-shadow:0 4px 20px rgba(0,255,136,0.3); }
+    .btn-verify:hover { box-shadow:0 6px 30px rgba(0,255,136,0.5); transform:translateY(-1px); }
+    .btn:disabled { opacity:0.45; cursor:not-allowed; transform:none !important; box-shadow:none !important; }
+
+    /* ── PROGRESS ── */
+    .prog { height:3px; background:var(--border); border-radius:2px; margin-top:1rem; overflow:hidden; display:none; }
+    .prog-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); animation:progAnim 1.4s ease-in-out infinite; }
+    @keyframes progAnim { 0%{width:0;margin-left:0} 50%{width:60%;margin-left:20%} 100%{width:0;margin-left:100%} }
+
+    /* ── SCAN LINE ── */
+    .scan-line { position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); animation:scanAnim 1.8s linear infinite; opacity:0; }
+    .scanning .scan-line { opacity:1; }
+    @keyframes scanAnim { 0%{top:0} 100%{top:100%} }
+
+    /* ── RESULTS ── */
+    .result-panel { margin-top:1.5rem; display:none; animation:fadeIn 0.35s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+    .result-banner {
+      display:flex; align-items:center; gap:1rem;
+      padding:1rem 1.2rem; border-radius:8px; margin-bottom:1rem; border:1px solid;
+    }
+    .result-banner.ok   { background:rgba(0,255,136,0.07); border-color:rgba(0,255,136,0.3); }
+    .result-banner.bad  { background:rgba(255,61,113,0.07); border-color:rgba(255,61,113,0.3); }
+    .result-banner.warn { background:rgba(255,170,0,0.07); border-color:rgba(255,170,0,0.3); }
+
+    .r-icon  { font-size:1.8rem; }
+    .r-title { font-family:'Orbitron',monospace; font-size:0.88rem; font-weight:700; }
+    .r-title.g { color:var(--accent2); }
+    .r-title.r { color:var(--accent3); }
+    .r-title.y { color:var(--accent4); }
+    .r-sub   { font-size:0.8rem; color:var(--muted); margin-top:0.2rem; }
+
+    .sec-label {
+      font-family:'Space Mono',monospace; font-size:0.62rem; color:var(--muted);
+      letter-spacing:0.15em; text-transform:uppercase; margin-bottom:0.5rem;
+      display:flex; align-items:center; gap:0.5rem;
+    }
+    .sec-label::after { content:''; flex:1; height:1px; background:var(--border); }
+
+    .htable { width:100%; border-collapse:collapse; }
+    .htable th { font-family:'Space Mono',monospace; font-size:0.6rem; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase; padding:0.5rem 0.75rem; background:rgba(255,255,255,0.03); text-align:left; }
+    .htable td { font-family:'Space Mono',monospace; font-size:0.62rem; padding:0.5rem 0.75rem; border-top:1px solid var(--border); word-break:break-all; vertical-align:top; }
+    .htable td:first-child { color:var(--accent); width:60px; white-space:nowrap; }
+    .htable .ok-cell  { color:var(--accent2); white-space:nowrap; }
+    .htable .bad-cell { color:var(--accent3); white-space:nowrap; }
+
+    /* ── REGISTRY ── */
+    .section-wrap {
+      position:relative; z-index:1;
+      max-width:1200px; margin:0 auto; padding:0 2rem 2.5rem;
+    }
+
+    .sec-title {
+      font-family:'Orbitron',monospace; font-size:1.05rem; font-weight:700;
+      color:#fff; margin-bottom:1rem; display:flex; align-items:center; gap:0.75rem;
+    }
+    .sec-title span { color:var(--accent); }
+
+    .table-wrap { background:var(--card); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+
+    .rtable { width:100%; border-collapse:collapse; }
+    .rtable th {
+      font-family:'Space Mono',monospace; font-size:0.62rem; letter-spacing:0.1em;
+      color:var(--muted); text-transform:uppercase; padding:0.9rem 1.2rem;
+      background:rgba(255,255,255,0.03); text-align:left; border-bottom:1px solid var(--border);
+    }
+    .rtable td { padding:0.85rem 1.2rem; font-size:0.85rem; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:middle; }
+    .rtable tr:last-child td { border-bottom:none; }
+    .rtable tr:hover td { background:rgba(0,212,255,0.03); }
+
+    .hash-s { font-family:'Space Mono',monospace; font-size:0.68rem; color:var(--muted); }
+
+    .del-btn {
+      background:rgba(255,61,113,0.12); border:1px solid rgba(255,61,113,0.3);
+      color:var(--accent3); padding:0.3rem 0.8rem; border-radius:4px;
+      font-family:'Space Mono',monospace; font-size:0.62rem; cursor:pointer; transition:all 0.2s;
+    }
+    .del-btn:hover { background:rgba(255,61,113,0.22); box-shadow:0 0 10px rgba(255,61,113,0.3); }
+
+    .empty { text-align:center; padding:3rem; color:var(--muted); font-family:'Space Mono',monospace; font-size:0.78rem; }
+
+    /* ── LOG ── */
+    .log-list { display:flex; flex-direction:column; gap:0.5rem; }
+
+    .log-item {
+      display:flex; align-items:center; gap:1rem;
+      background:var(--card); border:1px solid var(--border);
+      border-radius:8px; padding:0.75rem 1.2rem;
+      font-family:'Space Mono',monospace; font-size:0.68rem; transition:border-color 0.2s;
+    }
+    .log-item:hover { border-color:rgba(0,212,255,0.3); }
+
+    .log-badge { padding:0.2rem 0.6rem; border-radius:3px; font-size:0.58rem; font-weight:700; letter-spacing:0.08em; white-space:nowrap; }
+    .lb-up  { background:rgba(0,212,255,0.13); color:var(--accent); }
+    .lb-ok  { background:rgba(0,255,136,0.13); color:var(--accent2); }
+    .lb-bad { background:rgba(255,61,113,0.13); color:var(--accent3); }
+    .lb-del { background:rgba(255,170,0,0.13);  color:var(--accent4); }
+
+    .log-file { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); }
+    .log-time { color:var(--muted); white-space:nowrap; }
+
+    .log-status { padding:0.2rem 0.6rem; border-radius:3px; font-size:0.58rem; white-space:nowrap; }
+    .ls-ok   { background:rgba(0,255,136,0.1);  color:var(--accent2); }
+    .ls-bad  { background:rgba(255,61,113,0.1); color:var(--accent3); }
+    .ls-warn { background:rgba(255,170,0,0.1);  color:var(--accent4); }
+
+    /* ── FOOTER ── */
+    footer {
+      position:relative; z-index:1;
+      background:var(--surface); border-top:1px solid var(--border);
+      padding:2.5rem 2rem; text-align:center;
+    }
+
+    .footer-title { font-family:'Orbitron',monospace; font-size:1.1rem; font-weight:700; color:var(--accent); text-shadow:var(--glow); margin-bottom:0.5rem; letter-spacing:0.05em; }
+    .footer-div   { width:80px; height:1px; background:linear-gradient(90deg,transparent,var(--accent),transparent); margin:0.75rem auto; }
+
+    .footer-names { display:flex; justify-content:center; gap:3rem; flex-wrap:wrap; margin-top:0.75rem; }
+
+    .footer-name { font-family:'Space Mono',monospace; font-size:0.78rem; color:var(--text); }
+    .footer-name span { color:var(--accent2); display:block; font-size:0.65rem; margin-top:0.25rem; }
+
+    .footer-copy { margin-top:1.5rem; font-size:0.65rem; color:var(--muted); font-family:'Space Mono',monospace; }
+
+    /* ── TOASTS ── */
+    .toast-wrap { position:fixed; top:76px; right:1.5rem; z-index:999; display:flex; flex-direction:column; gap:0.5rem; }
+
+    .toast {
+      background:var(--card); border:1px solid var(--border);
+      border-radius:8px; padding:0.75rem 1.2rem;
+      font-family:'Space Mono',monospace; font-size:0.72rem;
+      max-width:310px; animation:slideIn 0.3s ease;
+      display:flex; align-items:center; gap:0.75rem;
+    }
+    .toast.success { border-color:rgba(0,255,136,0.4); }
+    .toast.error   { border-color:rgba(255,61,113,0.4); }
+
+    @keyframes slideIn { from{opacity:0;transform:translateX(110%)} to{opacity:1;transform:translateX(0)} }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#home" class="nav-logo">
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+      <path d="M16 2L3 8v9c0 7.5 5.4 14.5 13 16 7.6-1.5 13-8.5 13-16V8L16 2z"
+            fill="rgba(0,212,255,0.13)" stroke="#00d4ff" stroke-width="1.5"/>
+      <path d="M10 16l4 4 8-8" stroke="#00d4ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Integrity Shield
+  </a>
+
+  <ul class="nav-links">
+    <li><a onclick="goto('home')">Home</a></li>
+    <li><a onclick="goto('upload-sec')">Upload</a></li>
+    <li><a onclick="goto('verify-sec')">Verify</a></li>
+    <li><a onclick="goto('registry-sec')">Registry</a></li>
+    <li><a onclick="goto('log-sec')">Audit Log</a></li>
+  </ul>
+
+  <div class="nav-status"><div class="pulse-dot"></div>SYSTEM ONLINE</div>
+</nav>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<!-- HERO -->
+<section class="hero" id="home">
+  <div class="hero-badge">🛡 Advanced File Integrity Monitoring</div>
+  <h1>Detect <span class="grad">Tampering</span><br/>Protect <span class="grad">Truth</span></h1>
+  <p>Cryptographic hash verification using MD5, SHA-1, SHA-256 &amp; SHA-512 to guarantee zero-compromise file integrity for every asset you own.</p>
+</section>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stat-card"><div class="stat-num" id="st-files">{{ stats.total_files }}</div><div class="stat-label">Files Registered</div></div>
+  <div class="stat-card"><div class="stat-num green" id="st-ok">{{ stats.verified }}</div><div class="stat-label">Verified Intact</div></div>
+  <div class="stat-card"><div class="stat-num red" id="st-bad">{{ stats.tampered }}</div><div class="stat-label">Tampering Found</div></div>
+  <div class="stat-card"><div class="stat-num gold" id="st-chk">{{ stats.total_checks }}</div><div class="stat-label">Total Checks</div></div>
+</div>
+
+<!-- CARDS GRID -->
+<div class="main-grid">
+
+  <!-- UPLOAD -->
+  <div class="card" id="upload-sec">
+    <div class="scan-line"></div>
+    <div class="card-header">
+      <div class="card-icon blue">📤</div>
+      <div>
+        <div class="card-title">Register File</div>
+        <div class="card-subtitle">Upload &amp; record cryptographic baseline</div>
+      </div>
+    </div>
+
+    <div class="drop-zone" id="upZone" onclick="document.getElementById('upInput').click()">
+      <span class="drop-icon">🗂️</span>
+      <div class="drop-text">Drop file here or <span class="link">browse</span></div>
+      <div style="color:var(--muted);font-size:0.72rem;margin-top:0.4rem;">Any file type · Max 50 MB</div>
+    </div>
+    <input type="file" id="upInput" onchange="selUpload(event)"/>
+
+    <div class="file-info" id="upInfo">
+      <span>📄</span>
+      <div style="flex:1;min-width:0">
+        <div class="file-name" id="upName"></div>
+        <div class="file-sz"  id="upSz"></div>
+        <div class="size-bar"><div class="size-fill" id="upBar" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="prog" id="upProg"><div class="prog-fill"></div></div>
+    <button class="btn btn-upload" id="upBtn" onclick="doUpload()" disabled>⬆ REGISTER FILE</button>
+    <div class="result-panel" id="upResult"></div>
+  </div>
+
+  <!-- VERIFY -->
+  <div class="card" id="verify-sec">
+    <div class="scan-line"></div>
+    <div class="card-header">
+      <div class="card-icon green">🔍</div>
+      <div>
+        <div class="card-title">Verify Integrity</div>
+        <div class="card-subtitle">Compare against registered baseline</div>
+      </div>
+    </div>
+
+    <div class="drop-zone vzone" id="vZone" onclick="document.getElementById('vInput').click()">
+      <span class="drop-icon">🔐</span>
+      <div class="drop-text">Drop file here or <span class="link-g">browse</span></div>
+      <div style="color:var(--muted);font-size:0.72rem;margin-top:0.4rem;">Checks against registered hash</div>
+    </div>
+    <input type="file" id="vInput" onchange="selVerify(event)"/>
+
+    <div class="file-info gv" id="vInfo">
+      <span>📄</span>
+      <div style="flex:1;min-width:0">
+        <div class="file-name" id="vName"></div>
+        <div class="file-sz"  id="vSz"></div>
+      </div>
+    </div>
+
+    <div class="prog" id="vProg"><div class="prog-fill"></div></div>
+    <button class="btn btn-verify" id="vBtn" onclick="doVerify()" disabled>🔍 VERIFY INTEGRITY</button>
+    <div class="result-panel" id="vResult"></div>
+  </div>
+</div>
+
+<!-- REGISTRY -->
+<div class="section-wrap" id="registry-sec">
+  <div class="sec-title">🗃 File <span>Registry</span></div>
+  <div class="table-wrap">
+    <table class="rtable">
+      <thead>
+        <tr>
+          <th>Filename</th>
+          <th>SHA-256 (preview)</th>
+          <th>Size</th>
+          <th>Registered</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="regBody">
+        <tr><td colspan="5" class="empty">// No files registered yet</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- AUDIT LOG -->
+<div class="section-wrap" id="log-sec">
+  <div class="sec-title">📋 Audit <span>Log</span></div>
+  <div class="log-list" id="logList">
+    <div class="empty">// No activity recorded yet</div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-title">🛡 Integrity Monitoring System</div>
+  <div class="footer-div"></div>
+  <div class="footer-names">
+    <div class="footer-name">Rasika Thakre<span>CS23183</span></div>
+    <div class="footer-name">Sayali Padole<span>CS23154</span></div>
+  </div>
+  <div class="footer-copy">© 2024 · Cryptographic File Integrity Monitor · All rights reserved</div>
+</footer>
+
+<script>
+  let upFile = null, vFile = null;
+
+  // drag-drop
+  function initDrop(zone, handler) {
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('dragover'); const f = e.dataTransfer.files[0]; if(f) handler(f); });
+  }
+  initDrop(document.getElementById('upZone'), f => setUp(f));
+  initDrop(document.getElementById('vZone'),  f => setV(f));
+
+  function selUpload(e){ if(e.target.files[0]) setUp(e.target.files[0]); }
+  function selVerify(e){ if(e.target.files[0]) setV(e.target.files[0]); }
+
+  function setUp(f){
+    upFile = f;
+    document.getElementById('upName').textContent = f.name;
+    document.getElementById('upSz').textContent   = fmtSz(f.size);
+    document.getElementById('upBar').style.width  = Math.min(100,(f.size/(50*1024*1024))*100)+'%';
+    document.getElementById('upInfo').style.display = 'flex';
+    document.getElementById('upBtn').disabled = false;
+    document.getElementById('upResult').style.display = 'none';
+  }
+
+  function setV(f){
+    vFile = f;
+    document.getElementById('vName').textContent = f.name;
+    document.getElementById('vSz').textContent   = fmtSz(f.size);
+    document.getElementById('vInfo').style.display = 'flex';
+    document.getElementById('vBtn').disabled = false;
+    document.getElementById('vResult').style.display = 'none';
+  }
+
+  function fmtSz(b){ if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(2)+' MB'; }
+  function fmtDt(s){ return new Date(s).toLocaleString(); }
+
+  // ── UPLOAD ──
+  async function doUpload(){
+    if(!upFile) return;
+    const btn = document.getElementById('upBtn');
+    const prog= document.getElementById('upProg');
+    const card= document.getElementById('upload-sec');
+    btn.disabled=true; btn.textContent='REGISTERING...';
+    prog.style.display='block'; card.classList.add('scanning');
+    const fd = new FormData(); fd.append('file', upFile);
+    try{
+      const res  = await fetch('/upload',{method:'POST',body:fd});
+      const data = await res.json();
+      prog.style.display='none'; card.classList.remove('scanning');
+      btn.textContent='⬆ REGISTER FILE'; btn.disabled=false;
+      const panel = document.getElementById('upResult');
+      panel.style.display='block';
+      if(data.success){
+        panel.innerHTML=`
+          <div class="result-banner ok">
+            <div class="r-icon">✅</div>
+            <div><div class="r-title g">Registration Successful</div>
+            <div class="r-sub">${data.filename} · ${fmtSz(data.size)}</div></div>
+          </div>
+          <div class="sec-label">Cryptographic Hashes</div>
+          <table class="htable">
+            <tr><th>Algorithm</th><th>Hash Value</th></tr>
+            ${Object.entries(data.hashes).map(([k,v])=>`<tr><td>${k.toUpperCase()}</td><td>${v}</td></tr>`).join('')}
+          </table>
+          <div style="margin-top:0.75rem;font-family:'Space Mono',monospace;font-size:0.62rem;color:var(--muted)">Registered: ${fmtDt(data.timestamp)}</div>`;
+        toast('✅ File registered successfully!','success');
+        refreshAll();
+      } else {
+        panel.innerHTML=`<div class="result-banner bad"><div class="r-icon">❌</div><div><div class="r-title r">Failed</div><div class="r-sub">${data.error}</div></div></div>`;
+        toast('❌ '+data.error,'error');
+      }
+    } catch(e){
+      prog.style.display='none'; card.classList.remove('scanning');
+      btn.textContent='⬆ REGISTER FILE'; btn.disabled=false;
+      toast('❌ Network error','error');
+    }
+  }
+
+  // ── VERIFY ──
+  async function doVerify(){
+    if(!vFile) return;
+    const btn = document.getElementById('vBtn');
+    const prog= document.getElementById('vProg');
+    const card= document.getElementById('verify-sec');
+    btn.disabled=true; btn.textContent='SCANNING...';
+    prog.style.display='block'; card.classList.add('scanning');
+    const fd = new FormData(); fd.append('file', vFile);
+    try{
+      const res  = await fetch('/verify',{method:'POST',body:fd});
+      const data = await res.json();
+      prog.style.display='none'; card.classList.remove('scanning');
+      btn.textContent='🔍 VERIFY INTEGRITY'; btn.disabled=false;
+      const panel = document.getElementById('vResult');
+      panel.style.display='block';
+
+      if(!data.success){ panel.innerHTML=`<div class="result-banner bad"><div class="r-icon">❌</div><div><div class="r-title r">Error</div><div class="r-sub">${data.error}</div></div></div>`; return; }
+
+      if(data.status==='not_found'){
+        panel.innerHTML=`
+          <div class="result-banner warn">
+            <div class="r-icon">⚠️</div>
+            <div><div class="r-title y">Not In Registry</div>
+            <div class="r-sub">${data.filename} has not been registered yet</div></div>
+          </div>
+          <div class="sec-label">Current Hashes</div>
+          <table class="htable">
+            ${Object.entries(data.current_hashes).map(([k,v])=>`<tr><td>${k.toUpperCase()}</td><td>${v}</td></tr>`).join('')}
+          </table>`;
+        toast('⚠️ File not in registry','error'); return;
+      }
+
+      if(data.status==='intact'){
+        panel.innerHTML=`
+          <div class="result-banner ok">
+            <div class="r-icon">🛡</div>
+            <div><div class="r-title g">Integrity Verified — File Intact</div>
+            <div class="r-sub">All hashes match — file is unmodified</div></div>
+          </div>
+          <div class="sec-label">Hash Comparison</div>
+          <table class="htable">
+            <tr><th>Algorithm</th><th>Status</th><th>Hash</th></tr>
+            ${Object.entries(data.hash_comparison).map(([k,v])=>`
+              <tr><td>${k.toUpperCase()}</td><td class="ok-cell">✓ MATCH</td><td>${v.current}</td></tr>`).join('')}
+          </table>
+          <div style="margin-top:0.75rem;font-size:0.72rem;color:var(--muted)">Registered: ${fmtDt(data.registered_at)} &nbsp;·&nbsp; Verified: ${fmtDt(data.verified_at)}</div>`;
+        toast('✅ Integrity verified — file is intact!','success');
+      } else {
+        panel.innerHTML=`
+          <div class="result-banner bad">
+            <div class="r-icon">🚨</div>
+            <div><div class="r-title r">⚠ TAMPERING DETECTED</div>
+            <div class="r-sub">This file has been modified since registration</div></div>
+          </div>
+          <div class="sec-label">Hash Comparison</div>
+          <table class="htable">
+            <tr><th>Algorithm</th><th>Status</th><th>Values</th></tr>
+            ${Object.entries(data.hash_comparison).map(([k,v])=>`
+              <tr><td>${k.toUpperCase()}</td>
+              <td class="${v.match?'ok-cell':'bad-cell'}">${v.match?'✓ MATCH':'✗ MISMATCH'}</td>
+              <td>
+                <div style="color:var(--muted);font-size:0.6rem">ORIG:</div>
+                <div>${v.original}</div>
+                ${!v.match?`<div style="color:var(--muted);font-size:0.6rem;margin-top:4px">CURR:</div><div style="color:var(--accent3)">${v.current}</div>`:''}
+              </td></tr>`).join('')}
+          </table>
+          <div style="margin-top:0.75rem;font-size:0.72rem;color:var(--accent3)">
+            Size: ${fmtSz(data.original_size)} → ${fmtSz(data.current_size)} ${data.size_match?'(unchanged)':'(CHANGED ⚠)'}
+          </div>`;
+        toast('🚨 Tampering detected!','error');
+      }
+      refreshAll();
+    } catch(e){
+      prog.style.display='none'; card.classList.remove('scanning');
+      btn.textContent='🔍 VERIFY INTEGRITY'; btn.disabled=false;
+      toast('❌ Network error','error');
+    }
+  }
+
+  // ── REGISTRY ──
+  async function refreshReg(){
+    const res  = await fetch('/registry');
+    const data = await res.json();
+    const tbody= document.getElementById('regBody');
+    const entries = Object.entries(data.files);
+    if(!entries.length){ tbody.innerHTML=`<tr><td colspan="5" class="empty">// No files registered yet</td></tr>`; return; }
+    tbody.innerHTML = entries.map(([name,info])=>`
+      <tr>
+        <td>${name}</td>
+        <td><span class="hash-s">${info.hashes.sha256.substring(0,24)}…</span></td>
+        <td>${fmtSz(info.size)}</td>
+        <td style="font-size:0.75rem;color:var(--muted)">${fmtDt(info.uploaded_at)}</td>
+        <td><button class="del-btn" onclick="delFile('${name}')">DELETE</button></td>
+      </tr>`).join('');
+  }
+
+  async function delFile(name){
+    if(!confirm(`Remove "${name}" from registry?`)) return;
+    await fetch(`/delete/${encodeURIComponent(name)}`,{method:'DELETE'});
+    toast('🗑 File removed from registry','success');
+    refreshAll();
+  }
+
+  // ── LOGS ──
+  async function refreshLogs(){
+    const res  = await fetch('/logs');
+    const data = await res.json();
+    const list = document.getElementById('logList');
+    if(!data.logs.length){ list.innerHTML=`<div class="empty">// No activity recorded yet</div>`; return; }
+    list.innerHTML = data.logs.map(log=>{
+      let bc='lb-up';
+      if(log.action==='VERIFY') bc = log.status==='TAMPERED'?'lb-bad':'lb-ok';
+      if(log.action==='DELETE') bc = 'lb-del';
+      let sc='ls-ok';
+      if(['TAMPERED','REMOVED'].includes(log.status)) sc='ls-bad';
+      if(log.status==='NOT_FOUND') sc='ls-warn';
+      return `<div class="log-item">
+        <span class="log-badge ${bc}">${log.action}</span>
+        <span class="log-file">${log.filename||'—'}</span>
+        <span class="log-time">${fmtDt(log.timestamp)}</span>
+        <span class="log-status ${sc}">${log.status}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ── STATS ──
+  async function refreshStats(){
+    const res  = await fetch('/stats');
+    const data = await res.json();
+    document.getElementById('st-files').textContent = data.total_files;
+    document.getElementById('st-ok').textContent    = data.verified;
+    document.getElementById('st-bad').textContent   = data.tampered;
+    document.getElementById('st-chk').textContent   = data.total_checks;
+  }
+
+  function refreshAll(){ refreshReg(); refreshLogs(); refreshStats(); }
+
+  // ── TOAST ──
+  function toast(msg, type='success'){
+    const c = document.getElementById('toasts');
+    const t = document.createElement('div');
+    t.className = `toast ${type}`; t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(()=>{ t.style.transition='opacity 0.3s'; t.style.opacity='0'; setTimeout(()=>t.remove(),300); }, 3500);
+  }
+
+  function goto(id){ document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'}); }
+
+  // init
+  refreshAll();
+</script>
+</body>
+</html>

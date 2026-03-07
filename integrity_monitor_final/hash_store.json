@@ -1,0 +1,13 @@
+{
+  "file2.txt": {
+    "hashes": {
+      "md5": "319bd9a57e043c8d9b2b1250c4fbb485",
+      "sha1": "2bb279b08c4adbd462b9e80e88db8b584d410e40",
+      "sha256": "2a8687e03505c590e5dbf9b93dca6b830cb1011ae44b2dcb40929bbe399039fa",
+      "sha512": "5128545a52a18c06c5bcaac68cfa88bfa5cda85fce5f02ca8c772f1833b47848af323cbc9a90144ed405b8aeb042fa248cc3ecc7afe1e5a1c5bb4e5b019f8584"
+    },
+    "size": 25,
+    "uploaded_at": "2026-03-07T11:21:44.672776",
+    "original_name": "file2.txt"
+  }
+}
